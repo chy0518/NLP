@@ -1,0 +1,77 @@
+# =========================
+# Python cache
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# =========================
+# Virtual environments
+# =========================
+.env
+.venv/
+venv/
+env/
+conda/
+
+# =========================
+# System / IDE files
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Logs and temporary files
+# =========================
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# =========================
+# Experiment results
+# Do not upload generated outputs
+# =========================
+result/*
+!result/.gitkeep
+!result/README.md
+
+# =========================
+# Large model / checkpoint files
+# Keep models/*.py, ignore only weights
+# =========================
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.safetensors
+*.onnx
+*.gguf
+checkpoints/
+weights/
+
+# =========================
+# Large generated artifacts
+# Keep source code, ignore large data-like outputs
+# =========================
+*.jsonl
+*.parquet
+*.pkl
+*.pickle
+*.h5
+*.h5ad
+*.npy
+*.npz
+*.zip
+*.tar
+*.tar.gz
+*.gz

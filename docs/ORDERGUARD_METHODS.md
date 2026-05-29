@@ -98,15 +98,35 @@ and does not require an extra embedding model.
 
 ## Server Commands
 
+Run Qwen on full permutations first:
+
+```bash
+cd /root/autodl-tmp/OrderGuard/NLP
+MODEL=/root/models/Qwen2.5-VL-7B-Instruct
+
+PYTHONPATH=. python eval/run_qwen_vl_permutation_eval.py \
+  --model_path $MODEL \
+  --input_jsonl data/orderguard_caption_semvis_hard_test.jsonl \
+  --output_jsonl result/caption_semvis_hard_test_clean_perm24_qwen25vl.jsonl \
+  --project_root . \
+  --corruption clean \
+  --num_permutations 24 \
+  --max_new_tokens 64
+```
+
+For a cheaper first run, use `--num_permutations 12`. The script groups rows by
+`base_id`, so a 100-base test set with `--num_permutations 24` makes 2400 Qwen
+calls, not `400 * 24`.
+
 Clean semantic-category hard negative setting:
 
 ```bash
 cd /root/autodl-tmp/OrderGuard/NLP
 PYTHONPATH=. python eval/run_orderguard_methods.py \
-  --input_jsonl result/caption_semvis_hard_test_clean_qwen25vl.jsonl \
+  --input_jsonl result/caption_semvis_hard_test_clean_perm24_qwen25vl.jsonl \
   --dev_jsonl result/caption_semvis_hard_dev_clean_qwen25vl.jsonl \
-  --output_jsonl result/caption_semvis_hard_test_clean_orderguard_methods.jsonl \
-  --metrics_json result/caption_semvis_hard_test_clean_orderguard_metrics.json \
+  --output_jsonl result/caption_semvis_hard_test_clean_perm24_orderguard_methods.jsonl \
+  --metrics_json result/caption_semvis_hard_test_clean_perm24_orderguard_metrics.json \
   --lambda_bias 1.0 \
   --mu_evidence 0.5
 ```
@@ -116,9 +136,9 @@ position bias from the input file itself:
 
 ```bash
 PYTHONPATH=. python eval/run_orderguard_methods.py \
-  --input_jsonl result/caption_semvis_hard_test_clean_qwen25vl.jsonl \
-  --output_jsonl result/caption_semvis_hard_test_clean_orderguard_methods.jsonl \
-  --metrics_json result/caption_semvis_hard_test_clean_orderguard_metrics.json
+  --input_jsonl result/caption_semvis_hard_test_clean_perm24_qwen25vl.jsonl \
+  --output_jsonl result/caption_semvis_hard_test_clean_perm24_orderguard_methods.jsonl \
+  --metrics_json result/caption_semvis_hard_test_clean_perm24_orderguard_metrics.json
 ```
 
 ## Output

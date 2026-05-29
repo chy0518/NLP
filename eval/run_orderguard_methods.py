@@ -16,6 +16,7 @@ from methods.position_calibration import (
     aggregate_permutation_voting,
     aggregate_position_calibrated,
     aggregate_single_order,
+    aggregate_single_order_mean,
     estimate_position_bias,
 )
 
@@ -75,6 +76,7 @@ def main():
     metrics = []
 
     method_outputs = [
+        ("single_order_mean", aggregate_single_order_mean(rows)),
         (
             f"single_order_{args.single_position}",
             aggregate_single_order(rows, single_position=args.single_position),

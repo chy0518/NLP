@@ -55,6 +55,28 @@ def aggregate_single_order(rows, single_position="A"):
     return records
 
 
+def aggregate_single_order_mean(rows):
+    records = []
+    for row in rows:
+        scores, _ = majority_vote_scores([row])
+        tie_breaker = candidate_image_ids([row])
+        pred_image_id = choose_best(scores, tie_breaker)
+        gold = int(row["answer_image_id"])
+        records.append(
+            {
+                "sample_id": row["sample_id"],
+                "base_id": row["base_id"],
+                "method": "single_order_mean",
+                "prediction_image_id": pred_image_id,
+                "answer_image_id": gold,
+                "positive_position": row.get("positive_position"),
+                "is_correct": pred_image_id == gold,
+                "scores": {str(k): v for k, v in scores.items()},
+            }
+        )
+    return records
+
+
 def aggregate_permutation_voting(rows):
     records = []
     for base_id, group in sorted(group_by_base(rows).items()):
@@ -115,4 +137,3 @@ def aggregate_position_calibrated(rows, position_bias, lambda_bias=1.0):
             }
         )
     return records
-

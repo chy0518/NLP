@@ -9,6 +9,7 @@ from methods.position_calibration import (
     aggregate_permutation_voting,
     aggregate_position_calibrated,
     estimate_position_bias,
+    aggregate_single_order_mean,
 )
 
 
@@ -66,6 +67,15 @@ def test_permutation_voting_aggregates_by_original_image_id():
     assert records[0]["is_correct"] is True
 
 
+def test_single_order_mean_keeps_all_positioned_rows():
+    records = aggregate_single_order_mean(synthetic_rows())
+    summary = summarize_base_predictions(records)
+
+    assert len(records) == 4
+    assert summary["accuracy"] == 0.5
+    assert summary["correct"] == 2
+
+
 def test_position_calibration_penalizes_overused_positions():
     rows = synthetic_rows()
     bias = estimate_position_bias(rows, smoothing=0.0)
@@ -98,4 +108,3 @@ def test_extract_evidence_from_raw_response():
     }
 
     assert extract_evidence(row) == "a red bus is parked on the street"
-

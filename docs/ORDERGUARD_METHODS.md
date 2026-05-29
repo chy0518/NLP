@@ -17,15 +17,20 @@ Each raw output row contains one positioned version of a base sample:
 The key step is mapping the predicted label back to the original `image_id`.
 This avoids treating "A" as the same answer across different permutations.
 
-## Method 1: Single Order
+## Method 1: Single Order Mean
 
-Use one positioned version per `base_id` as the baseline prediction.
+Use every positioned sample as an ordinary one-shot evaluation case, then report
+the accuracy over all rows.
 
-By default, the script uses the row where `positive_position == A`, but this can
-be changed with `--single_position`.
+```text
+SingleOrderMean = correct positioned rows / all positioned rows
+```
 
-This baseline represents ordinary one-shot evaluation under a fixed displayed
-order.
+This is the fairest single-order baseline because it averages over correct
+answers appearing at `A/B/C/D`. The script also prints `single_order_A` by
+default as a position-specific diagnostic, but it should not be treated as the
+main baseline because a model that favors A can look artificially strong when
+the gold image is placed at A.
 
 ## Method 2: Permutation Voting
 
@@ -121,6 +126,7 @@ PYTHONPATH=. python eval/run_orderguard_methods.py \
 The script prints a base-level accuracy table:
 
 ```text
+single_order_mean: accuracy=...
 single_order_A: accuracy=...
 permutation_voting: accuracy=...
 position_calibrated: accuracy=...
@@ -139,12 +145,11 @@ The optional prediction JSONL contains one row per method per `base_id`, with:
 
 ## Reporting Interpretation
 
-Use `single_order_A` as the simple one-order baseline, `permutation_voting` as
-the self-consistency baseline, and `position_calibrated` as the main proposed
-method.
+Use `single_order_mean` as the simple one-order baseline, `permutation_voting`
+as the self-consistency baseline, and `position_calibrated` as the main proposed
+method. Use `single_order_A/B/C/D` only for position-bias analysis.
 
 Use `evidence_orderguard` as an enhanced variant. If it improves results, report
 it as OrderGuard++. If it is close to position calibration, report it as an
 analysis-oriented extension showing that evidence consistency can be integrated
 without additional model calls.
-

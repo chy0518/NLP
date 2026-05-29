@@ -165,6 +165,7 @@ def build_messages(sample, project_root):
 
 
 def run_one_sample(model, processor, sample, project_root, max_new_tokens):
+    import torch
     from qwen_vl_utils import process_vision_info
 
     messages = build_messages(sample, project_root)

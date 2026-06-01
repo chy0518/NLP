@@ -653,6 +653,31 @@ D 11 / 59 = 0.1864
 unstable_position_gap: 0.1525
 
 ⸻
+## Balanced 4-position 结果
+
+为排除原始 4-position 中 negative order 未完全均衡的问题，我们构造了 balanced 4-position 数据集。该设置保证每个 base sample 内的 positive image 和三个 hard negatives 都分别出现在 A/B/C/D 各一次，从而解耦图像身份与位置。
+
+| Setting | Accuracy | All-4 Consistency | Unstable Bases | Full Gap | Unstable-only Gap |
+
+|---|---:|---:|---:|---:|---:|
+
+| Original Large Clean | 86.58% | 81.33% | 56 / 300 | 3.00% | 16.07% |
+
+| Balanced Large Clean | 87.58% | 83.00% | 51 / 300 | 4.67% | 27.45% |
+
+在 balanced setting 下，模型的 full-set position gap 为 4.67%，unstable-only gap 达到 27.45%。这说明即使排除了 negative order confound，困难样本中仍然存在明显的 performance-level position sensitivity。
+## Balanced 4-position under Occlusion
+
+在 balanced 4-position setting 中，我们进一步加入 occlusion 扰动，以测试视觉证据退化时顺序敏感性是否仍然存在。
+
+| Setting | Accuracy | All-4 Consistency | Unstable Bases | Full Gap | Unstable-only Gap |
+|---|---:|---:|---:|---:|---:|
+| Balanced Clean | 87.58% | 83.00% | 51 / 300 | 4.67% | 27.45% |
+| Balanced Occlusion | 85.33% | 79.33% | 62 / 300 | 4.33% | 20.97% |
+
+Occlusion 使模型准确率从 87.58% 下降到 85.33%，all-4 consistency 从 83.00% 下降到 79.33%，unstable bases 从 51 增加到 62。这说明视觉证据被遮挡后，模型在不同排列下更难保持稳定判断。
+
+同时，即使在 balanced setting 中，occlusion 下的 unstable-only gap 仍达到 20.97%，说明顺序敏感性并非仅由负样本固定顺序导致，而是在困难样本中真实存在的 performance-level position sensitivity。
 
 5. 代表性失败案例
 

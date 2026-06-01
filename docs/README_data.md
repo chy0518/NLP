@@ -319,3 +319,150 @@ For command options:
 ```bash
 python3 data/coco_caption_semantic_visual_hard_builder.py --help
 ```
+
+## Build Balanced 4-position Semantic+Category Hard Negative Dataset
+
+The original 4-position semantic-category split changes the positive image
+position, but keeps the negative image order partially fixed:
+
+```text
+pos_A: A=positive, B=neg1, C=neg2, D=neg3
+pos_B: A=neg1,    B=positive, C=neg2, D=neg3
+pos_C: A=neg1,    B=neg2, C=positive, D=neg3
+pos_D: A=neg1,    B=neg2, C=neg3, D=positive
+```
+
+This means a preference for option `A` can mix true position effects with the
+identity of a particularly confusing negative image. The balanced 4-position
+builder keeps only four rows per base sample, but rotates all four images so
+each image appears exactly once at `A`, `B`, `C`, and `D`:
+
+```text
+pos_A: A=positive, B=neg1, C=neg2, D=neg3
+pos_B: A=neg3,    B=positive, C=neg1, D=neg2
+pos_C: A=neg2,    B=neg3, C=positive, D=neg1
+pos_D: A=neg1,    B=neg2, C=neg3, D=positive
+```
+
+This split is better suited for analyzing performance-level position
+sensitivity than the original 4-position layout, while remaining much cheaper
+than evaluating all 24 permutations.
+
+Run:
+
+```bash
+python data/coco_caption_balanced_position_builder.py \
+  --input_dev data/orderguard_caption_semvis_hard_large_dev.jsonl \
+  --input_test data/orderguard_caption_semvis_hard_large_test.jsonl \
+  --output_dev data/orderguard_caption_semvis_hard_large_balanced_dev.jsonl \
+  --output_test data/orderguard_caption_semvis_hard_large_balanced_test.jsonl \
+  --project_root .
+```
+
+Output:
+
+```text
+data/orderguard_caption_semvis_hard_large_balanced_dev.jsonl
+data/orderguard_caption_semvis_hard_large_balanced_test.jsonl
+```
+
+Scale:
+
+```text
+caption_semvis_hard_large_balanced_dev: 50 base samples -> 200 JSONL rows
+caption_semvis_hard_large_balanced_test: 300 base samples -> 1200 JSONL rows
+```
+
+Check output:
+
+```bash
+wc -l data/orderguard_caption_semvis_hard_large_balanced_dev.jsonl \
+      data/orderguard_caption_semvis_hard_large_balanced_test.jsonl
+head -n 1 data/orderguard_caption_semvis_hard_large_balanced_test.jsonl | python3 -m json.tool
+```
+
+Expected:
+
+```text
+200 data/orderguard_caption_semvis_hard_large_balanced_dev.jsonl
+1200 data/orderguard_caption_semvis_hard_large_balanced_test.jsonl
+1400 total
+```
+
+For command options:
+
+```bash
+python3 data/coco_caption_balanced_position_builder.py --help
+```
+
+## Build RAG-style Multi-image VQA Dataset
+
+This split follows the RAG-VQA-style setting more closely than caption
+matching. Each base sample contains four images. One image is the
+question-relevant image, and the other three are hard distractor images. The
+model must answer a VQA question by choosing one text option from `A/B/C/D`.
+
+Image positions are named `Image 1`, `Image 2`, `Image 3`, and `Image 4` to
+avoid confusing image positions with text answer options. For every base
+sample, the question and text answer options stay fixed while the relevant
+image is moved across all four image positions.
+
+The builder creates three kinds of COCO-derived questions:
+
+```text
+object_existence: Which object is present in the relevant image?
+activity: What activity is most likely shown in the relevant image?
+animal_type / vehicle_type: Which type of animal/vehicle appears in the relevant image?
+```
+
+Hard distractor images are selected by category overlap, same-supergroup
+similarity, and person co-occurrence. The output keeps both `images` and
+`options` as aliases so downstream runners can be adapted incrementally.
+
+Run:
+
+```bash
+python data/coco_rag_style_vqa_builder.py \
+  --coco_root data/coco \
+  --caption_file data/coco/annotations/captions_val2017.json \
+  --instance_file data/coco/annotations/instances_val2017.json \
+  --out_dir data \
+  --num_dev 50 \
+  --num_test 200 \
+  --seed 20260528
+```
+
+Output:
+
+```text
+data/orderguard_rag_vqa_dev.jsonl
+data/orderguard_rag_vqa_test.jsonl
+```
+
+Default scale:
+
+```text
+rag_vqa_dev: 50 base samples -> 200 JSONL rows
+rag_vqa_test: 200 base samples -> 800 JSONL rows
+```
+
+Check output:
+
+```bash
+wc -l data/orderguard_rag_vqa_dev.jsonl data/orderguard_rag_vqa_test.jsonl
+head -n 1 data/orderguard_rag_vqa_test.jsonl | python3 -m json.tool
+```
+
+Expected:
+
+```text
+200 data/orderguard_rag_vqa_dev.jsonl
+800 data/orderguard_rag_vqa_test.jsonl
+1000 total
+```
+
+For command options:
+
+```bash
+python3 data/coco_rag_style_vqa_builder.py --help
+```

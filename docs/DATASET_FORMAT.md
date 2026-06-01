@@ -29,6 +29,10 @@ data/orderguard_caption_hardneg_dev.jsonl
 data/orderguard_caption_hardneg_test.jsonl
 data/orderguard_caption_semvis_hard_dev.jsonl
 data/orderguard_caption_semvis_hard_test.jsonl
+data/orderguard_caption_semvis_hard_large_balanced_dev.jsonl
+data/orderguard_caption_semvis_hard_large_balanced_test.jsonl
+data/orderguard_rag_vqa_dev.jsonl
+data/orderguard_rag_vqa_test.jsonl
 ```
 
 默认规模：
@@ -42,6 +46,10 @@ caption hardneg_dev: 30 个 base samples，展开后 120 行
 caption hardneg_test: 100 个 base samples，展开后 400 行
 caption semvis hard_dev: 30 个 base samples，展开后 120 行
 caption semvis hard_test: 100 个 base samples，展开后 400 行
+caption semvis hard large balanced_dev: 50 个 base samples，展开后 200 行
+caption semvis hard large balanced_test: 300 个 base samples，展开后 1200 行
+rag_vqa_dev: 50 个 base samples，展开后 200 行
+rag_vqa_test: 200 个 base samples，展开后 800 行
 ```
 
 每一行是一个完整的 JSON 对象。JSONL 的意思是 JSON Lines，也就是一行一个
@@ -347,6 +355,191 @@ caption semantic similarity。
 
 评测时仍然只把 `question` 和 4 张图片给模型。所有 score、shared categories、
 positive categories 都是分析字段，不建议作为模型输入。
+
+## Balanced 4-position Semantic+Category Hard Negative Dataset
+
+balanced 4-position 数据集文件是：
+
+```text
+data/orderguard_caption_semvis_hard_large_balanced_dev.jsonl
+data/orderguard_caption_semvis_hard_large_balanced_test.jsonl
+```
+
+这个版本基于 `orderguard_caption_semvis_hard_large_dev/test` 重新排列选项。原始
+4-position 设置虽然让 positive image 分别出现在 `A/B/C/D`，但三张 negative
+images 的顺序没有完全均衡。例如 `neg1` 经常出现在 `A`，`neg3` 经常出现在
+`D`。因此，原始 4-position 中观察到的某个选项偏多，可能同时混合了真实位置效应
+和 hard negative 图片身份效应。
+
+balanced 4-position 保持每个 base sample 仍然只有 4 行，但让同一组 4 张图中的
+每一张都恰好出现在 `A/B/C/D` 各一次：
+
+```text
+pos_A: A=positive, B=neg1, C=neg2, D=neg3
+pos_B: A=neg3,    B=positive, C=neg1, D=neg2
+pos_C: A=neg2,    B=neg3, C=positive, D=neg1
+pos_D: A=neg1,    B=neg2, C=neg3, D=positive
+```
+
+因此它比原始 4-position 更适合分析 performance-level position sensitivity：
+即正确图位于不同位置时，模型是否更容易答对。同时，它只需要每个 base sample
+评测 4 次，比完整 24-permutation 更省推理成本。
+
+字段与 `caption_semvis_hard` 基本一致，主要差异是：
+
+| 字段 | 含义 |
+| --- | --- |
+| `task_type` | 固定为 `caption_matching_semantic_category_hard_negative_balanced_position`。 |
+| `split` | `caption_semvis_hard_large_balanced_dev` 或 `caption_semvis_hard_large_balanced_test`。 |
+| `sample_id` | 例如 `caption_semvis_hard_large_balanced_test_000001_pos_A`。 |
+| `base_id` | 例如 `caption_semvis_hard_large_balanced_test_base_000001`。 |
+
+negative option 中已有的 hard-negative 分析字段会保留：
+
+- `hard_negative_score`
+- `caption_similarity`
+- `image_similarity`
+- `category_overlap_score`
+- `shared_categories`
+
+评测时仍然只把 `question` 和 4 张图片给模型，不要泄露 `is_correct`、`answer`、
+`answer_image_id` 或 `positive_position`。
+
+## RAG-style Multi-image VQA Dataset
+
+RAG-style Multi-image VQA 数据集文件是：
+
+```text
+data/orderguard_rag_vqa_dev.jsonl
+data/orderguard_rag_vqa_test.jsonl
+```
+
+这个数据集参考原论文 RAG-VQA 的思路：每个样本包含 4 张图片，其中 1 张是
+question-relevant image，另外 3 张是 hard distractor images。问题和文本答案选项
+在同一个 base sample 的 4 行中保持不变，只改变 relevant image 位于
+`Image 1`、`Image 2`、`Image 3`、`Image 4` 的位置。
+
+与 caption matching 不同，这个任务的输出不是图片选项，而是文本答案选项：
+
+```text
+Option A / Option B / Option C / Option D
+```
+
+为了避免混淆，图片位置不用 `A/B/C/D` 表示，而是使用：
+
+```text
+Image 1 / Image 2 / Image 3 / Image 4
+```
+
+支持的问题类型包括：
+
+- `object_existence`：询问 relevant image 中出现了哪个物体。
+- `activity`：根据 COCO object 组合构造简单活动问题，例如 tennis、baseball、skiing。
+- `animal_type`：询问 relevant image 中出现的动物类型。
+- `vehicle_type`：询问 relevant image 中出现的交通工具类型。
+
+每个 base sample 使用 balanced image layout：
+
+```text
+imgpos_1: Image 1=R,  Image 2=D1, Image 3=D2, Image 4=D3
+imgpos_2: Image 1=D3, Image 2=R,  Image 3=D1, Image 4=D2
+imgpos_3: Image 1=D2, Image 2=D3, Image 3=R,  Image 4=D1
+imgpos_4: Image 1=D1, Image 2=D2, Image 3=D3, Image 4=R
+```
+
+其中 `R` 是 relevant image，`D1/D2/D3` 是 hard distractor images。这个设计保证
+同一个 base sample 内每张图都恰好出现在四个图片位置各一次，因此可以测试模型是否
+会因为关键证据图的位置变化而产生不同答案。
+
+每行主要字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `sample_id` | 当前 image-positioned sample 的唯一 ID，例如 `rag_vqa_test_000001_imgpos_1`。 |
+| `base_id` | base sample 的 ID。同一个 base sample 对应 4 行。 |
+| `split` | `rag_vqa_dev` 或 `rag_vqa_test`。 |
+| `task_type` | 固定为 `rag_style_multi_image_vqa`。 |
+| `vqa_type` | 问题类型，例如 `object_existence`、`activity`、`animal_type`、`vehicle_type`。 |
+| `question` | 给模型的问题。 |
+| `text_options` | 文本答案选项，标签为 `A/B/C/D`。 |
+| `answer` | 正确文本答案标签，例如 `A`。 |
+| `answer_text` | 正确文本答案内容。 |
+| `target_category` | 构造该问题时使用的 COCO target category。 |
+| `relevant_image_id` | question-relevant image 的 COCO image id。 |
+| `relevant_image_position` | relevant image 当前所在图片位置，取值为 `1/2/3/4`。 |
+| `positive_position` | 与 `relevant_image_position` 对应的字符串，例如 `Image 1`。 |
+| `images` | 4 张图片，按 `Image 1` 到 `Image 4` 排列。 |
+| `options` | `images` 的别名，方便后续兼容旧 runner。 |
+
+`images/options` 中每个元素包含：
+
+| 字段 | 含义 |
+| --- | --- |
+| `position` | 图片位置，取值为 `1/2/3/4`。 |
+| `label` | 图片位置标签，例如 `Image 1`。 |
+| `image_id` | COCO image id。 |
+| `file_name` | COCO 图片文件名。 |
+| `path` | 从 `OrderGuard/` 出发的相对图片路径。 |
+| `is_relevant` | 是否为 question-relevant image。 |
+| `hard_negative_score` | 仅 distractor image 有，表示 hard distractor 分数。 |
+| `shared_categories` | 仅 distractor image 有，表示与 relevant image 共享的 COCO categories。 |
+| `category_overlap_score` | 仅 distractor image 有，COCO category Jaccard overlap。 |
+| `same_supergroup_bonus` | 仅 distractor image 有，同 supergroup 加分。 |
+| `person_cooccurrence_bonus` | 仅 distractor image 有，两图都含 person 时的加分。 |
+
+示例结构：
+
+```json
+{
+  "sample_id": "rag_vqa_test_000001_imgpos_1",
+  "base_id": "rag_vqa_test_base_000001",
+  "split": "rag_vqa_test",
+  "task_type": "rag_style_multi_image_vqa",
+  "vqa_type": "activity",
+  "question": "What activity is most likely shown in the relevant image?",
+  "text_options": [
+    {"label": "A", "text": "tennis"},
+    {"label": "B", "text": "baseball"},
+    {"label": "C", "text": "skiing"},
+    {"label": "D", "text": "surfing"}
+  ],
+  "answer": "A",
+  "answer_text": "tennis",
+  "target_category": "tennis racket",
+  "relevant_image_id": 123,
+  "relevant_image_position": 1,
+  "positive_position": "Image 1",
+  "images": [
+    {
+      "position": 1,
+      "label": "Image 1",
+      "image_id": 123,
+      "file_name": "000000000123.jpg",
+      "path": "data/coco/val2017/000000000123.jpg",
+      "is_relevant": true
+    }
+  ],
+  "options": [
+    {
+      "position": 1,
+      "label": "Image 1",
+      "image_id": 123,
+      "file_name": "000000000123.jpg",
+      "path": "data/coco/val2017/000000000123.jpg",
+      "is_relevant": true
+    }
+  ]
+}
+```
+
+评测时应该把 `question`、`text_options` 和 4 张图片给模型。不要泄露：
+
+- `answer`
+- `answer_text`
+- `is_relevant`
+- `relevant_image_id`
+- `relevant_image_position`
+- `positive_position`
 
 ## 推荐模型输入格式
 

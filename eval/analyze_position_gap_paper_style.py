@@ -1,77 +1,91 @@
 import argparse
 import json
-from collections import defaultdict, Counter
+from collections import OrderedDict
 
-POSITIONS = ["A", "B", "C", "D"]
 
-def load_by_base(path):
-    by_base = defaultdict(list)
+LEGACY_POSITIONS = ["A", "B", "C", "D"]
+IMAGE_POSITIONS = ["Image 1", "Image 2", "Image 3", "Image 4"]
+
+
+def load_jsonl(path):
     with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            r = json.loads(line)
-            by_base[r["base_id"]].append(r)
-    return by_base
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def group_by_base_id(rows):
+    grouped = OrderedDict()
+    for row in rows:
+        grouped.setdefault(row["base_id"], []).append(row)
+    return grouped
+
+
+def position_order(rows):
+    positions = {row.get("positive_position") for row in rows}
+    if positions and positions.issubset(set(IMAGE_POSITIONS)):
+        return IMAGE_POSITIONS
+    if positions and positions.issubset(set(LEGACY_POSITIONS)):
+        return LEGACY_POSITIONS
+    return sorted(position for position in positions if position is not None)
+
+
+def position_accuracy(rows, positions):
+    result = {}
+    for position in positions:
+        position_rows = [row for row in rows if row.get("positive_position") == position]
+        correct = sum(1 for row in position_rows if row.get("is_correct"))
+        total = len(position_rows)
+        acc = correct / total if total else 0.0
+        result[position] = (correct, total, acc)
+    return result
+
+
+def position_gap(position_stats):
+    accs = [acc for _, total, acc in position_stats.values() if total > 0]
+    if not accs:
+        return 0.0
+    return max(accs) - min(accs)
+
+
+def print_stats(title, stats):
+    print(title)
+    for position, (correct, total, acc) in stats.items():
+        print(f"{position} {correct} / {total} = {acc:.4f}")
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_jsonl", required=True)
     args = parser.parse_args()
 
-    by_base = load_by_base(args.input_jsonl)
+    rows = load_jsonl(args.input_jsonl)
+    grouped = group_by_base_id(rows)
+    positions = position_order(rows)
 
-    total_bases = len(by_base)
-    all4_correct_bases = 0
+    all4_correct_bases = []
     unstable_bases = []
+    for base_id, base_rows in grouped.items():
+        if all(row.get("is_correct") for row in base_rows):
+            all4_correct_bases.append(base_id)
+        else:
+            unstable_bases.append(base_id)
 
-    all_pos_total = Counter()
-    all_pos_correct = Counter()
+    unstable_rows = [
+        row
+        for base_id in unstable_bases
+        for row in grouped[base_id]
+    ]
 
-    unstable_pos_total = Counter()
-    unstable_pos_correct = Counter()
+    full_stats = position_accuracy(rows, positions)
+    unstable_stats = position_accuracy(unstable_rows, positions)
 
-    for base_id, group in by_base.items():
-        group = sorted(group, key=lambda x: x["positive_position"])
-        flags = [bool(g["is_correct"]) for g in group]
+    print(f"total_bases: {len(grouped)}")
+    print(f"all4_correct_bases: {len(all4_correct_bases)}")
+    print(f"unstable_bases: {len(unstable_bases)}")
+    print_stats("Full-set position accuracy:", full_stats)
+    print(f"full_position_gap: {position_gap(full_stats):.4f}")
+    print_stats("Paper-style unstable-only position accuracy:", unstable_stats)
+    print(f"unstable_position_gap: {position_gap(unstable_stats):.4f}")
 
-        for g in group:
-            pos = g["positive_position"]
-            all_pos_total[pos] += 1
-            if g["is_correct"]:
-                all_pos_correct[pos] += 1
-
-        if all(flags):
-            all4_correct_bases += 1
-            continue
-
-        unstable_bases.append(base_id)
-        for g in group:
-            pos = g["positive_position"]
-            unstable_pos_total[pos] += 1
-            if g["is_correct"]:
-                unstable_pos_correct[pos] += 1
-
-    print("file:", args.input_jsonl)
-    print("total_bases:", total_bases)
-    print("all4_correct_bases:", all4_correct_bases)
-    print("unstable_bases:", len(unstable_bases))
-    print()
-
-    print("Full-set position accuracy:")
-    full_accs = []
-    for p in POSITIONS:
-        acc = all_pos_correct[p] / all_pos_total[p] if all_pos_total[p] else 0
-        full_accs.append(acc)
-        print(p, all_pos_correct[p], "/", all_pos_total[p], round(acc, 4))
-    print("full_position_gap:", round(max(full_accs) - min(full_accs), 4))
-    print()
-
-    print("Paper-style unstable-only position accuracy:")
-    unstable_accs = []
-    for p in POSITIONS:
-        acc = unstable_pos_correct[p] / unstable_pos_total[p] if unstable_pos_total[p] else 0
-        unstable_accs.append(acc)
-        print(p, unstable_pos_correct[p], "/", unstable_pos_total[p], round(acc, 4))
-    print("unstable_position_gap:", round(max(unstable_accs) - min(unstable_accs), 4))
 
 if __name__ == "__main__":
     main()

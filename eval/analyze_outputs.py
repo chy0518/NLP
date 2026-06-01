@@ -1,6 +1,47 @@
 import argparse
 import json
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict
+
+
+LEGACY_POSITIONS = ["A", "B", "C", "D"]
+IMAGE_POSITIONS = ["Image 1", "Image 2", "Image 3", "Image 4"]
+
+
+def load_jsonl(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def group_by_base_id(rows):
+    grouped = OrderedDict()
+    for row in rows:
+        grouped.setdefault(row["base_id"], []).append(row)
+    return grouped
+
+
+def position_order(rows):
+    positions = {row.get("positive_position") for row in rows}
+    if positions and positions.issubset(set(IMAGE_POSITIONS)):
+        return IMAGE_POSITIONS
+    if positions and positions.issubset(set(LEGACY_POSITIONS)):
+        return LEGACY_POSITIONS
+    return sorted(position for position in positions if position is not None)
+
+
+def accuracy(rows):
+    if not rows:
+        return 0.0
+    return sum(1 for row in rows if row.get("is_correct")) / len(rows)
+
+
+def print_position_accuracy(rows):
+    order = position_order(rows)
+    for position in order:
+        position_rows = [row for row in rows if row.get("positive_position") == position]
+        correct = sum(1 for row in position_rows if row.get("is_correct"))
+        total = len(position_rows)
+        acc = correct / total if total else 0.0
+        print(f"{position} {correct} / {total} = {acc:.4f}")
 
 
 def main():
@@ -8,48 +49,30 @@ def main():
     parser.add_argument("--input_jsonl", required=True)
     args = parser.parse_args()
 
-    rows = [json.loads(x) for x in open(args.input_jsonl, encoding="utf-8")]
-    n = len(rows)
-
-    if n == 0:
-        print("empty file")
-        return
-
-    acc = sum(bool(r["is_correct"]) for r in rows) / n
-    pred_counter = Counter(r.get("prediction") for r in rows)
-
-    pos_total = Counter(r["positive_position"] for r in rows)
-    pos_correct = Counter(r["positive_position"] for r in rows if r["is_correct"])
-
-    print("file:", args.input_jsonl)
-    print("n:", n)
-    print("accuracy:", round(acc, 4))
-    print("prediction_frequency:", dict(pred_counter))
-
-    print("accuracy_by_positive_position:")
-    for p in ["A", "B", "C", "D"]:
-        total = pos_total[p]
-        correct = pos_correct[p]
-        print(p, correct, "/", total, round(correct / total, 4) if total else None)
-
-    by_base = defaultdict(list)
-    for r in rows:
-        by_base[r["base_id"]].append(r)
+    rows = load_jsonl(args.input_jsonl)
+    grouped = group_by_base_id(rows)
+    prediction_frequency = Counter(row.get("prediction") for row in rows)
 
     all4_correct = 0
     any_correct = 0
-
-    for _, group in by_base.items():
-        flags = [bool(x["is_correct"]) for x in group]
-
-        if all(flags):
+    for base_rows in grouped.values():
+        if all(row.get("is_correct") for row in base_rows):
             all4_correct += 1
-        if any(flags):
+        if any(row.get("is_correct") for row in base_rows):
             any_correct += 1
 
-    print("num_bases:", len(by_base))
-    print("all_4_correct_consistency:", round(all4_correct / len(by_base), 4))
-    print("any_correct:", round(any_correct / len(by_base), 4))
+    print(f"n: {len(rows)}")
+    print(f"accuracy: {accuracy(rows):.4f}")
+    print(f"prediction_frequency: {dict(prediction_frequency)}")
+    print("accuracy_by_positive_position:")
+    print_position_accuracy(rows)
+    print(f"num_bases: {len(grouped)}")
+    if grouped:
+        print(f"all_4_correct_consistency: {all4_correct / len(grouped):.4f}")
+        print(f"any_correct: {any_correct / len(grouped):.4f}")
+    else:
+        print("all_4_correct_consistency: 0.0000")
+        print("any_correct: 0.0000")
 
 
 if __name__ == "__main__":

@@ -190,18 +190,29 @@ def main():
         description="Aggregate RAG-style VQA permutation outputs with answer voting."
     )
     parser.add_argument("--input_jsonl", required=True)
+    parser.add_argument(
+        "--weight_jsonl",
+        default=None,
+        help=(
+            "Optional permutation output JSONL used only to estimate Image 1/2/3/4 "
+            "reliability weights. If omitted, weights are estimated from input_jsonl."
+        ),
+    )
     parser.add_argument("--output_jsonl", default=None)
     parser.add_argument("--metrics_json", default=None)
     args = parser.parse_args()
 
     rows = load_jsonl(args.input_jsonl)
-    position_weights, position_weight_stats = estimate_position_weights(rows)
+    weight_rows = load_jsonl(args.weight_jsonl) if args.weight_jsonl else rows
+    weight_source = args.weight_jsonl if args.weight_jsonl else args.input_jsonl
+    position_weights, position_weight_stats = estimate_position_weights(weight_rows)
     records = aggregate_rows(rows, position_weights=position_weights)
     majority_metrics = summarize(records, method="permutation_answer_voting")
     weighted_metrics = summarize(records, method="position_weighted_answer_voting")
 
     print("input:", args.input_jsonl)
-    print("position_weights_from_input:")
+    print("weight_source:", weight_source)
+    print("position_weights:")
     for position in IMAGE_POSITIONS:
         stats = position_weight_stats[position]
         print(
@@ -226,6 +237,8 @@ def main():
     if args.metrics_json:
         out = {
             "input_jsonl": args.input_jsonl,
+            "weight_jsonl": args.weight_jsonl,
+            "weight_source": weight_source,
             "position_weights": position_weights,
             "position_weight_stats": position_weight_stats,
             "metrics": [

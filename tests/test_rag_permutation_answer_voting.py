@@ -5,6 +5,7 @@ from eval.run_qwen_vl_rag_permutation_eval import (
 from eval.run_rag_answer_voting import (
     aggregate_rows,
     estimate_position_weights,
+    load_jsonl,
     summarize,
 )
 
@@ -172,3 +173,15 @@ def test_position_weighted_answer_voting_uses_reliability_weights():
     assert by_method["permutation_answer_voting"]["prediction"] == "B"
     assert by_method["position_weighted_answer_voting"]["prediction"] == "A"
     assert summarize(records, method="position_weighted_answer_voting")["accuracy"] == 1.0
+
+
+def test_load_jsonl_round_trip_for_weight_sources(tmp_path):
+    path = tmp_path / "rows.jsonl"
+    row = make_rag_base()
+    row["prediction"] = "A"
+    path.write_text(__import__("json").dumps(row) + "\n", encoding="utf-8")
+
+    loaded = load_jsonl(path)
+
+    assert loaded[0]["base_id"] == "rag_base_1"
+    assert loaded[0]["prediction"] == "A"

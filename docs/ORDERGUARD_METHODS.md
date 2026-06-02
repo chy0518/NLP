@@ -138,9 +138,52 @@ PYTHONPATH=. python eval/run_rag_answer_voting.py \
   --metrics_json result/rag_vqa_test_clean_perm12_answer_voting_metrics.json
 ```
 
+For the current main RAG-VQA result, estimate position reliability on dev
+permutation outputs and use softmax-weighted voting on test:
+
+```bash
+PYTHONPATH=. python eval/run_rag_answer_voting.py \
+  --input_jsonl result/rag_vqa_test_clean_perm12_qwen25vl.jsonl \
+  --weight_jsonl result/rag_vqa_dev_clean_perm12_qwen25vl.jsonl \
+  --weight_mode softmax \
+  --temperature 0.1 \
+  --output_jsonl result/rag_vqa_test_clean_perm12_vote_softmax01.jsonl \
+  --metrics_json result/rag_vqa_test_clean_perm12_vote_softmax01_metrics.json
+```
+
 This RAG-VQA voting script aggregates text answers (`A/B/C/D`). It is separate
 from the image-choice OrderGuard methods below, which map predicted labels back
 to image IDs.
+
+### RAG-style VQA Streamlit Demo
+
+After generating the permutation JSONL and optional voting JSONL, launch the
+visual demo on the server:
+
+```bash
+cd /root/autodl-tmp/OrderGuard/NLP
+
+streamlit run demo/app.py \
+  --server.address 0.0.0.0 \
+  --server.port 8501
+```
+
+The app defaults to:
+
+- `result/rag_vqa_test_clean_perm12_qwen25vl.jsonl`
+- `result/rag_vqa_test_clean_perm12_vote_softmax01.jsonl`
+
+If you used different filenames, edit the paths in the left sidebar after the
+page opens. The demo is meant for case analysis: choose a `base_id`, inspect all
+permutation answers, compare raw majority with weighted prediction, and show
+examples where majority voting is wrong but position-weighted voting is correct.
+
+If Streamlit fails with a `starlette.middleware.gzip` import error, update the
+server packages once:
+
+```bash
+pip install -U "streamlit>=1.45" "starlette>=0.46"
+```
 
 ### Image-choice OrderGuard Methods
 

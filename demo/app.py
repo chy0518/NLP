@@ -47,6 +47,13 @@ def sorted_text_options(row):
     return [by_label[label] for label in ANSWER_LABELS if label in by_label]
 
 
+def answer_text_for_label(row, label):
+    for option in row.get("text_options", []):
+        if option.get("label") == label:
+            return option.get("text", "")
+    return ""
+
+
 def prediction_counts(rows):
     counts = Counter()
     for row in rows:
@@ -105,6 +112,10 @@ def render_summary(base_rows, voting_records):
     st.write(f"**Base ID:** `{first['base_id']}`")
     st.write(f"**Question:** {first.get('question', '')}")
     st.write(f"**Gold Answer:** `{first.get('answer')}` - {first.get('answer_text', '')}")
+    st.caption(
+        "Predictions are text answer labels (A/B/C/D). "
+        "Relevant image position is shown separately as Image 1/2/3/4."
+    )
 
     summary_cols = st.columns(4)
     summary_cols[0].metric("Permutations", len(base_rows))
@@ -143,14 +154,19 @@ def render_vote_charts(base_rows, voting_records):
 def render_permutation(row):
     pred = row.get("prediction") or "None"
     answer = row.get("answer")
-    is_correct = pred == answer
+    is_correct = bool(row.get("is_correct", pred == answer))
     position = row.get("positive_position")
+    pred_text = answer_text_for_label(row, pred)
+    answer_text = answer_text_for_label(row, answer) or row.get("answer_text", "")
     title = (
         f"Permutation {row.get('permutation_index', '?')} | "
-        f"Relevant: {position} | Prediction: {pred} | {correctness_badge(is_correct)}"
+        f"Relevant image: {position} | "
+        f"Pred answer: {pred} | {correctness_badge(is_correct)}"
     )
 
     with st.expander(title, expanded=False):
+        st.write(f"**Predicted text answer:** `{pred}` - {pred_text}")
+        st.write(f"**Gold text answer:** `{answer}` - {answer_text}")
         st.write(f"**Evidence:** {row.get('evidence') or row.get('raw_response', '')}")
         image_cols = st.columns(4)
         for col, image in zip(image_cols, sorted_images(row)):
@@ -220,4 +236,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

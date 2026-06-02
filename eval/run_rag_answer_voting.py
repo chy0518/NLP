@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 from collections import Counter, OrderedDict
 from pathlib import Path
 
@@ -82,6 +83,57 @@ def estimate_position_weights(rows, smoothing=0.0):
         }
         for position in IMAGE_POSITIONS
     }
+
+
+def transform_position_weights(
+    raw_weights,
+    mode="raw",
+    alpha=1.0,
+    threshold=0.5,
+    temperature=0.1,
+    epsilon=1e-6,
+):
+    if mode == "raw":
+        return dict(raw_weights)
+
+    if mode == "power":
+        return {
+            position: float(weight) ** alpha
+            for position, weight in raw_weights.items()
+        }
+
+    if mode == "threshold":
+        return {
+            position: 1.0 if float(weight) >= threshold else 0.0
+            for position, weight in raw_weights.items()
+        }
+
+    if mode == "softmax":
+        if temperature <= 0:
+            raise ValueError("--temperature must be positive for softmax weighting")
+        logits = {
+            position: float(weight) / temperature
+            for position, weight in raw_weights.items()
+        }
+        max_logit = max(logits.values()) if logits else 0.0
+        exp_values = {
+            position: math.exp(logit - max_logit)
+            for position, logit in logits.items()
+        }
+        denom = sum(exp_values.values())
+        return {
+            position: value / denom if denom else 0.0
+            for position, value in exp_values.items()
+        }
+
+    if mode == "logit":
+        transformed = {}
+        for position, weight in raw_weights.items():
+            clipped = min(max(float(weight), epsilon), 1.0 - epsilon)
+            transformed[position] = math.log(clipped / (1.0 - clipped))
+        return transformed
+
+    raise ValueError(f"Unknown weight mode: {mode}")
 
 
 def choose_majority(counts, answer_labels=ANSWER_LABELS):
@@ -200,23 +252,52 @@ def main():
     )
     parser.add_argument("--output_jsonl", default=None)
     parser.add_argument("--metrics_json", default=None)
+    parser.add_argument(
+        "--weight_mode",
+        default="raw",
+        choices=["raw", "power", "threshold", "softmax", "logit"],
+        help=(
+            "How to transform Image-position reliability before weighted voting. "
+            "raw uses accuracy directly; power uses accuracy^alpha; threshold "
+            "keeps positions with accuracy >= threshold; softmax sharpens by "
+            "temperature; logit uses log(acc/(1-acc))."
+        ),
+    )
+    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument("--temperature", type=float, default=0.1)
     args = parser.parse_args()
 
     rows = load_jsonl(args.input_jsonl)
     weight_rows = load_jsonl(args.weight_jsonl) if args.weight_jsonl else rows
     weight_source = args.weight_jsonl if args.weight_jsonl else args.input_jsonl
-    position_weights, position_weight_stats = estimate_position_weights(weight_rows)
+    raw_position_weights, position_weight_stats = estimate_position_weights(weight_rows)
+    position_weights = transform_position_weights(
+        raw_position_weights,
+        mode=args.weight_mode,
+        alpha=args.alpha,
+        threshold=args.threshold,
+        temperature=args.temperature,
+    )
     records = aggregate_rows(rows, position_weights=position_weights)
     majority_metrics = summarize(records, method="permutation_answer_voting")
     weighted_metrics = summarize(records, method="position_weighted_answer_voting")
 
     print("input:", args.input_jsonl)
     print("weight_source:", weight_source)
+    print(
+        "weight_mode:",
+        args.weight_mode,
+        f"alpha={args.alpha}",
+        f"threshold={args.threshold}",
+        f"temperature={args.temperature}",
+    )
     print("position_weights:")
     for position in IMAGE_POSITIONS:
         stats = position_weight_stats[position]
         print(
-            f"{position}: weight={position_weights[position]:.4f} "
+            f"{position}: raw={raw_position_weights[position]:.4f} "
+            f"effective={position_weights[position]:.4f} "
             f"correct={stats['correct']}/{stats['total']}"
         )
     print(
@@ -239,6 +320,11 @@ def main():
             "input_jsonl": args.input_jsonl,
             "weight_jsonl": args.weight_jsonl,
             "weight_source": weight_source,
+            "weight_mode": args.weight_mode,
+            "alpha": args.alpha,
+            "threshold": args.threshold,
+            "temperature": args.temperature,
+            "raw_position_weights": raw_position_weights,
             "position_weights": position_weights,
             "position_weight_stats": position_weight_stats,
             "metrics": [

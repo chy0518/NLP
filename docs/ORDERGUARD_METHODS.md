@@ -98,6 +98,52 @@ and does not require an extra embedding model.
 
 ## Server Commands
 
+### RAG-style VQA Permutation Answer Voting
+
+Run Qwen on K image permutations per RAG-VQA base sample:
+
+```bash
+cd /root/autodl-tmp/OrderGuard/NLP
+MODEL=/root/models/Qwen2.5-VL-7B-Instruct
+
+PYTHONPATH=. python eval/run_qwen_vl_rag_permutation_eval.py \
+  --model_path $MODEL \
+  --input_jsonl data/orderguard_rag_vqa_test.jsonl \
+  --output_jsonl result/rag_vqa_test_clean_perm12_qwen25vl.jsonl \
+  --project_root . \
+  --corruption clean \
+  --num_permutations 12 \
+  --max_new_tokens 64
+```
+
+For a quick smoke test:
+
+```bash
+PYTHONPATH=. python eval/run_qwen_vl_rag_permutation_eval.py \
+  --model_path $MODEL \
+  --input_jsonl data/orderguard_rag_vqa_test.jsonl \
+  --output_jsonl result/debug_rag_vqa_perm2_base3_qwen25vl.jsonl \
+  --project_root . \
+  --num_permutations 2 \
+  --limit_bases 3 \
+  --max_new_tokens 64
+```
+
+Aggregate the permutation answers with majority voting over text answer labels:
+
+```bash
+PYTHONPATH=. python eval/run_rag_answer_voting.py \
+  --input_jsonl result/rag_vqa_test_clean_perm12_qwen25vl.jsonl \
+  --output_jsonl result/rag_vqa_test_clean_perm12_answer_voting.jsonl \
+  --metrics_json result/rag_vqa_test_clean_perm12_answer_voting_metrics.json
+```
+
+This RAG-VQA voting script aggregates text answers (`A/B/C/D`). It is separate
+from the image-choice OrderGuard methods below, which map predicted labels back
+to image IDs.
+
+### Image-choice OrderGuard Methods
+
 Run Qwen on full permutations first:
 
 ```bash

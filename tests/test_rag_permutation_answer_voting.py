@@ -2,7 +2,11 @@ from eval.run_qwen_vl_rag_permutation_eval import (
     generate_permuted_samples,
     unique_base_samples,
 )
-from eval.run_rag_answer_voting import aggregate_rows, summarize
+from eval.run_rag_answer_voting import (
+    aggregate_rows,
+    estimate_position_weights,
+    summarize,
+)
 
 
 def make_rag_base(base_id="rag_base_1"):
@@ -110,3 +114,61 @@ def test_rag_answer_voting_tie_breaks_by_answer_label_order():
 
     assert records[0]["prediction"] == "A"
 
+
+def test_position_weights_are_estimated_from_input_accuracy():
+    base = make_rag_base()
+    rows = []
+    for idx, (position, pred) in enumerate(
+        [
+            ("Image 1", "A"),
+            ("Image 1", "A"),
+            ("Image 2", "B"),
+            ("Image 2", "A"),
+        ]
+    ):
+        row = dict(base)
+        row["sample_id"] = f"base_perm_{idx}"
+        row["positive_position"] = position
+        row["prediction"] = pred
+        row["is_correct"] = pred == "A"
+        rows.append(row)
+
+    weights, stats = estimate_position_weights(rows)
+
+    assert weights["Image 1"] == 1.0
+    assert weights["Image 2"] == 0.5
+    assert stats["Image 1"] == {"correct": 2, "total": 2, "accuracy": 1.0}
+    assert stats["Image 3"] == {"correct": 0, "total": 0, "accuracy": 0.0}
+
+
+def test_position_weighted_answer_voting_uses_reliability_weights():
+    base = make_rag_base()
+    rows = []
+    for idx, (position, pred) in enumerate(
+        [
+            ("Image 1", "A"),
+            ("Image 2", "B"),
+            ("Image 3", "B"),
+        ]
+    ):
+        row = dict(base)
+        row["sample_id"] = f"base_perm_{idx}"
+        row["positive_position"] = position
+        row["prediction"] = pred
+        row["is_correct"] = pred == "A"
+        rows.append(row)
+
+    records = aggregate_rows(
+        rows,
+        position_weights={
+            "Image 1": 1.0,
+            "Image 2": 0.1,
+            "Image 3": 0.1,
+            "Image 4": 0.1,
+        },
+    )
+    by_method = {record["method"]: record for record in records}
+
+    assert by_method["permutation_answer_voting"]["prediction"] == "B"
+    assert by_method["position_weighted_answer_voting"]["prediction"] == "A"
+    assert summarize(records, method="position_weighted_answer_voting")["accuracy"] == 1.0

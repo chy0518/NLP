@@ -110,6 +110,8 @@ def render_summary(base_rows, voting_records):
 
     st.subheader("Sample Summary")
     st.write(f"**Base ID:** `{first['base_id']}`")
+    if first.get("retrieval_clue"):
+        st.write(f"**Retrieval Clue:** {first['retrieval_clue']}")
     st.write(f"**Question:** {first.get('question', '')}")
     st.write(f"**Gold Answer:** `{first.get('answer')}` - {first.get('answer_text', '')}")
     st.caption(
@@ -151,7 +153,7 @@ def render_vote_charts(base_rows, voting_records):
         st.bar_chart(weighted["position_weights"])
 
 
-def render_permutation(row):
+def render_permutation(row, display_index):
     pred = row.get("prediction") or "None"
     answer = row.get("answer")
     is_correct = bool(row.get("is_correct", pred == answer))
@@ -159,7 +161,7 @@ def render_permutation(row):
     pred_text = answer_text_for_label(row, pred)
     answer_text = answer_text_for_label(row, answer) or row.get("answer_text", "")
     title = (
-        f"Permutation {row.get('permutation_index', '?')} | "
+        f"Permutation {display_index} | "
         f"Relevant image: {position} | "
         f"Pred answer: {pred} | {correctness_badge(is_correct)}"
     )
@@ -186,11 +188,12 @@ def render_permutation(row):
 def render_permutations(base_rows):
     st.subheader("Permutation Details")
     sorted_rows = sorted(
-        base_rows,
-        key=lambda row: int(row.get("permutation_index", 0)),
+        enumerate(base_rows, start=1),
+        key=lambda item: int(item[1].get("permutation_index", item[0])),
     )
-    for row in sorted_rows:
-        render_permutation(row)
+    for fallback_index, row in sorted_rows:
+        display_index = row.get("permutation_index", fallback_index)
+        render_permutation(row, display_index)
 
 
 def main():

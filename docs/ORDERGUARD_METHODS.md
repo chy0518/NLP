@@ -185,6 +185,30 @@ server packages once:
 pip install -U "streamlit>=1.45" "starlette>=0.46"
 ```
 
+### COCO Image-choice Streamlit Demo
+
+For the COCO caption/image-choice task, use the separate demo app:
+
+```bash
+cd /root/autodl-tmp/OrderGuard/NLP
+
+streamlit run demo/coco_app.py \
+  --server.address 0.0.0.0 \
+  --server.port 8502
+```
+
+The app defaults to:
+
+- `result/caption_semvis_hard_test_clean_perm8_qwen25vl.jsonl`
+- `result/caption_semvis_hard_test_clean_perm8_orderguard_methods.jsonl`
+
+If you used `perm24`, `qwen25vl3b`, or another setting, edit the paths in the
+left sidebar after the page opens. This demo maps each predicted option label
+back to the original COCO `image_id`, so it can show raw label counts,
+image-level vote counts, and the final `permutation_voting`,
+`position_calibrated`, and `evidence_orderguard` predictions for the same base
+sample.
+
 ### Image-choice OrderGuard Methods
 
 Run Qwen on full permutations first:

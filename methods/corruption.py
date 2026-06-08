@@ -1,7 +1,8 @@
-from pathlib import Path
-from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
 import random
+from pathlib import Path
+
 import numpy as np
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 
 def load_rgb(path):
@@ -43,7 +44,14 @@ def apply_corruption(img, corruption="clean", severity=1, seed=42):
     raise ValueError(f"Unknown corruption: {corruption}")
 
 
-def corrupt_option_images(sample, project_root, corruption="clean", severity=1, only_positive=False, seed=42):
+def corrupt_option_images(
+    sample,
+    project_root,
+    corruption="clean",
+    severity=1,
+    only_positive=False,
+    seed=42,
+):
     if corruption == "clean":
         new_sample = dict(sample)
         new_sample["corruption"] = "clean"
@@ -69,7 +77,11 @@ def corrupt_option_images(sample, project_root, corruption="clean", severity=1, 
                 seed=seed + int(opt["image_id"]),
             )
 
-            rel_out = Path("data/corrupted") / f"{corruption}_s{severity}_{scope}" / opt["file_name"]
+            rel_out = (
+                Path("data/corrupted")
+                / f"{corruption}_s{severity}_{scope}"
+                / opt["file_name"]
+            )
             abs_out = project_root / rel_out
             abs_out.parent.mkdir(parents=True, exist_ok=True)
 

@@ -98,7 +98,7 @@ def transform_position_weights(
 
     if mode == "power":
         return {
-            position: float(weight) ** alpha
+            position: float(weight)**alpha
             for position, weight in raw_weights.items()
         }
 
@@ -216,7 +216,7 @@ def aggregate_base_weighted(group, position_weights):
 
 def aggregate_rows(rows, position_weights=None):
     records = []
-    for _, group in group_by_base_id(rows).items():
+    for group in group_by_base_id(rows).values():
         records.append(aggregate_base_majority(group))
         if position_weights is not None:
             records.append(aggregate_base_weighted(group, position_weights))

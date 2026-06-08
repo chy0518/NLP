@@ -12,7 +12,11 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from tqdm import tqdm
 
-RAG_TASK_TYPE = "rag_style_multi_image_vqa"
+RAG_TASK_TYPES = {
+    "rag_style_multi_image_vqa",
+    "rag_style_multi_image_vqa_retrieval",
+    "rag_style_multi_image_vqa_retrieval_category",
+}
 ANSWER_LABELS = ("A", "B", "C", "D")
 IMAGE_POSITIONS = (1, 2, 3, 4)
 
@@ -64,8 +68,8 @@ def unique_base_samples(rows, limit_bases=None):
     seen = set()
     bases = []
     for row in rows:
-        if row.get("task_type") != RAG_TASK_TYPE:
-            raise ValueError(f"expected {RAG_TASK_TYPE}, got {row.get('task_type')}")
+        if row.get("task_type") not in RAG_TASK_TYPES:
+            raise ValueError(f"expected one of {RAG_TASK_TYPES}, got {row.get('task_type')}")
 
         base_id = row["base_id"]
         if base_id in seen:
@@ -129,7 +133,11 @@ def generate_permuted_samples(base_sample, num_permutations, seed, corruption, s
     if num_permutations < 1 or num_permutations > len(all_perms):
         raise ValueError(f"num_permutations must be between 1 and {len(all_perms)}")
 
-    selected = all_perms if num_permutations == len(all_perms) else rng.sample(all_perms, num_permutations)
+    selected = (
+        all_perms
+        if num_permutations == len(all_perms)
+        else rng.sample(all_perms, num_permutations)
+    )
     samples = []
     for perm_index, perm in enumerate(selected):
         samples.append(
@@ -353,8 +361,9 @@ def main():
                     project_root=project_root,
                     max_new_tokens=args.max_new_tokens,
                 )
-                pred = parse_answer(response)
-                fout.write(json.dumps(output_record(sample, pred, response), ensure_ascii=False) + "\n")
+                prediction = parse_answer(response)
+                record = output_record(sample, prediction, response)
+                fout.write(json.dumps(record, ensure_ascii=False) + "\n")
                 fout.flush()
                 progress.update(1)
 
@@ -365,4 +374,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -20,7 +20,11 @@ except ImportError:
     corrupt_option_images = None
 
 
-RAG_TASK_TYPE = "rag_style_multi_image_vqa"
+RAG_TASK_TYPES = {
+    "rag_style_multi_image_vqa",
+    "rag_style_multi_image_vqa_retrieval",
+    "rag_style_multi_image_vqa_retrieval_category",
+}
 ANSWER_LABELS = ["A", "B", "C", "D"]
 
 
@@ -45,7 +49,7 @@ def parse_answer(text):
 
 
 def is_rag_vqa_sample(sample):
-    return sample.get("task_type") == RAG_TASK_TYPE
+    return sample.get("task_type") in RAG_TASK_TYPES
 
 
 def sorted_rag_images(sample):
@@ -294,8 +298,8 @@ def main():
                 clean_up_tokenization_spaces=False,
             )[0]
 
-            pred = parse_answer(response)
-            record = output_record(sample, pred, response)
+            prediction = parse_answer(response)
+            record = output_record(sample, prediction, response)
             fout.write(json.dumps(record, ensure_ascii=False) + "\n")
             fout.flush()
 
